@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 協作與數位轉型實務：全功能儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #334155; scroll-behavior: smooth; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto; height: 300px; }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .tab-active { border-bottom: 2px solid #4f46e5; color: #4f46e5; font-weight: 600; }
+        .tab-inactive { color: #64748b; }
+        .tab-inactive:hover { color: #334155; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .dot-flashing {
+            position: relative; width: 10px; height: 10px; border-radius: 5px; background-color: #4f46e5; color: #4f46e5; animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s;
+        }
+        .dot-flashing::before, .dot-flashing::after { content: ""; display: inline-block; position: absolute; top: 0; }
+        .dot-flashing::before { left: -15px; width: 10px; height: 10px; border-radius: 5px; background-color: #4f46e5; animation: dot-flashing 1s infinite alternate; animation-delay: 0s; }
+        .dot-flashing::after { left: 15px; width: 10px; height: 10px; border-radius: 5px; background-color: #4f46e5; animation: dot-flashing 1s infinite alternate; animation-delay: 1s; }
+        @keyframes dot-flashing { 0% { background-color: #4f46e5; } 50%, 100% { background-color: #e2e8f0; } }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-indigo-600">AI 協作實務</span>
+                    <span class="ml-2 text-sm text-slate-500 hidden sm:block">| 任務中心</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="#mission" class="text-sm font-medium text-slate-600 hover:text-indigo-600">情境</a>
+                    <a href="#ai-lab" class="text-sm font-medium text-indigo-600 font-bold">✨ AI 實驗室</a>
+                    <a href="#grading" class="text-sm font-medium text-slate-600 hover:text-indigo-600">評分</a>
+                    <button onclick="toggleSettings()" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="API 設定">
+                        <span class="text-xl">⚙️</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- API Key Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 fade-in">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center">🔑 API 安全設定</h3>
+            <p class="text-sm text-slate-500 mb-6">
+                為了安全起見，請輸入您個人的 Gemini API Key。您的金鑰會儲存在本地瀏覽器，不會傳送給教師。
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 underline">點此申請免費金鑰</a>
+            </p>
+            <input type="password" id="user-api-key" placeholder="貼上您的 API Key..." class="w-full px-4 py-3 border border-slate-200 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-indigo-500">
+            <div class="flex space-x-3">
+                <button onclick="saveApiKey()" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors">儲存金鑰</button>
+                <button onclick="toggleSettings()" class="px-4 py-2 text-slate-400 hover:text-slate-600">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- Header / Hero -->
+        <div class="bg-white rounded-2xl shadow-sm p-8 mb-8 border-l-4 border-indigo-500 fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div>
+                    <span class="inline-block px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full mb-2">核心實作模組一</span>
+                    <h1 class="text-3xl font-bold text-slate-800 mb-2">【小明的一天】上班族高效工作流模擬</h1>
+                    <p class="text-slate-600">發布日期：2024年10月24日</p>
+                </div>
+                <div class="mt-4 md:mt-0 text-right">
+                    <div class="text-sm text-slate-500">目標狀態</div>
+                    <div class="text-lg font-bold text-emerald-600">效率、順利、準時下班</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 1: The Mission Scenario -->
+        <section id="mission" class="mb-12 fade-in" style="animation-delay: 0.1s;">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center">
+                    <span class="text-2xl mr-2">🎯</span> 任務情境：為什麼是「小明」？
+                </h2>
+                <p class="mt-2 text-slate-600 max-w-3xl">模擬真實職場痛點，建立數位轉型思維。各組需開發出一個可互動的一日行程網頁原型。</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                    <div class="p-6 hover:bg-slate-50 transition-colors">
+                        <div class="text-4xl mb-4">😫</div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">現狀：混亂的一天</h3>
+                        <p class="text-slate-600 text-sm">資訊過載、會議繁多、報表處理耗時。這是職場中常見的低效迴圈。</p>
+                    </div>
+                    <div class="p-6 bg-indigo-50/50">
+                        <div class="text-4xl mb-4">🤖</div>
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">介入：AI 協作</h3>
+                        <p class="text-slate-600 text-sm">利用 <strong>Gemini Advanced</strong> 進行策略梳理、資訊過濾與自動化排程。</p>
+                    </div>
+                    <div class="p-6 hover:bg-slate-50 transition-colors">
+                        <div class="text-4xl mb-4">🚀</div>
+                        <h3 class="text-lg font-bold text-emerald-600 mb-2">目標：高效原型</h3>
+                        <p class="text-slate-600 text-sm">產出 HTML 互動網頁，展示優化後的順暢工作流。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ✨ Section 2: AI Creative Lab -->
+        <section id="ai-lab" class="mb-12 fade-in" style="animation-delay: 0.2s;">
+            <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-200 shadow-sm p-8">
+                <div class="mb-8 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 flex items-center">✨ AI 創意實驗室</h2>
+                        <p class="mt-2 text-slate-600">請點擊 ⚙️ 設定您的 API Key 即可啟動開發輔助功能。</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Feature A -->
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">🧠 職場痛點發想</h3>
+                        <div class="flex space-x-2">
+                            <input type="text" id="ai-role-input" placeholder="例如：行銷副理" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button onclick="brainstormPainPoints()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all font-bold">激發創意</button>
+                        </div>
+                        <div id="brainstorm-loading" class="hidden mt-6 flex justify-center py-4"><div class="dot-flashing"></div></div>
+                        <div id="brainstorm-result" class="mt-6 text-sm text-slate-700 bg-slate-50 rounded-lg p-4 hidden border border-dashed border-slate-200"></div>
+                    </div>
+                    <!-- Feature B -->
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">💻 原型代碼草稿</h3>
+                        <div class="flex space-x-2">
+                            <input type="text" id="ai-scenario-input" placeholder="例如：處理三封緊急客訴郵件" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+                            <button onclick="generateCodeSketch()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all font-bold">生成代碼</button>
+                        </div>
+                        <div id="code-loading" class="hidden mt-6 flex justify-center py-4"><div class="dot-flashing"></div></div>
+                        <div id="code-result-container" class="mt-6 hidden">
+                            <div class="flex justify-between items-center mb-1"><span class="text-[10px] text-slate-400 font-bold uppercase">HTML / Tailwind</span><button onclick="copyCode()" class="text-xs text-indigo-600 hover:underline">複製</button></div>
+                            <pre id="code-result" class="text-[11px] bg-slate-900 text-white rounded-lg p-4 overflow-x-auto max-h-[180px] scrollbar-hide"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Resource Allocation -->
+        <section id="resources" class="mb-12 fade-in" style="animation-delay: 0.3s;">
+            <div class="mb-6"><h2 class="text-2xl font-bold text-slate-800">💎 資源分配方案</h2></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 card-hover group">
+                    <div class="p-2 w-fit bg-indigo-100 rounded-lg text-indigo-600 text-xl font-bold mb-4">A</div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">老師贊助方案</h3>
+                    <p class="text-sm text-slate-600 mb-4">由老師提供管理員帳號，透過「家庭群組」功能進行權限共享。</p>
+                    <ul class="text-sm space-y-2 text-slate-500 border-t pt-4">
+                        <li class="flex items-center">✅ 組長加入指定家庭群組</li>
+                        <li class="flex items-center">✅ 每組組員共享 AI Advanced 權限</li>
+                    </ul>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 card-hover group">
+                    <div class="p-2 w-fit bg-orange-100 rounded-lg text-orange-600 text-xl font-bold mb-4">B</div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">自主試用方案</h3>
+                    <p class="text-sm text-slate-600 mb-4">適合未加入贊助群組的小組，利用免費試用期作為開發資源。</p>
+                    <ul class="text-sm space-y-2 text-slate-500 border-t pt-4">
+                        <li class="flex items-center">✅ 指派一名未訂閱過的組員</li>
+                        <li class="flex items-center">✅ 開啟一個月免費試用期</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Task Matrix -->
+        <section id="tasks" class="mb-12 fade-in" style="animation-delay: 0.4s;">
+            <div class="mb-6"><h2 class="text-2xl font-bold text-slate-800">🛠️ 實作任務與技能矩陣</h2></div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="flex overflow-x-auto border-b border-slate-200 scrollbar-hide">
+                    <button onclick="switchTab('task1')" id="tab-task1" class="px-6 py-4 text-sm font-medium whitespace-nowrap tab-active">行程策略</button>
+                    <button onclick="switchTab('task2')" id="tab-task2" class="px-6 py-4 text-sm font-medium whitespace-nowrap tab-inactive">資訊處理</button>
+                    <button onclick="switchTab('task3')" id="tab-task3" class="px-6 py-4 text-sm font-medium whitespace-nowrap tab-inactive">視覺生成</button>
+                    <button onclick="switchTab('task4')" id="tab-task4" class="px-6 py-4 text-sm font-medium whitespace-nowrap tab-inactive">網頁實作</button>
+                    <button onclick="switchTab('task5')" id="tab-task5" class="px-6 py-4 text-sm font-medium whitespace-nowrap tab-inactive">敘事與溝通</button>
+                </div>
+                <div class="p-8 min-h-[160px]">
+                    <div id="content-task1" class="task-content">
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">Workflow Design：行程策略規劃</h3>
+                        <p class="text-slate-700">利用 AI Canvas 梳理一日優先順序，生成最優化的工作流策略。</p>
+                    </div>
+                    <div id="content-task2" class="task-content hidden">
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">Data Literacy：資訊過濾與處理</h3>
+                        <p class="text-slate-700">練習透過 AI 快速處理海量郵件與報表，擷取決策關鍵數據。</p>
+                    </div>
+                    <div id="content-task3" class="task-content hidden">
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">Visual Experience：情境視覺生成</h3>
+                        <p class="text-slate-700">撰寫 Prompt 生成工作場景或視覺素材，強化溝通的視覺感染力。</p>
+                    </div>
+                    <div id="content-task4" class="task-content hidden">
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">Tech Implementation：網頁原型實作</h3>
+                        <p class="text-slate-700">管理 AI 產出的 HTML 程式碼，將行程模組轉化為可互動的網頁介面。</p>
+                    </div>
+                    <div id="content-task5" class="task-content hidden">
+                        <h3 class="text-lg font-bold text-indigo-700 mb-2">MKT & Audio：敘事與溝通優化</h3>
+                        <p class="text-slate-700">運用 AI 進行文案優化與聲音設計 (Audio Prompt)，完成專業展示。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Grading & Action -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 fade-in" style="animation-delay: 0.5s;">
+            <!-- Grading -->
+            <section id="grading" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6">📊 評分標準 (Grading)</h2>
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-grow space-y-4">
+                        <div class="flex items-center space-x-3"><div class="w-3 h-3 rounded-full bg-blue-500"></div><span class="text-sm font-bold text-slate-700">平日成績 (50%)</span></div>
+                        <div class="flex items-center space-x-3"><div class="w-3 h-3 rounded-full bg-teal-400"></div><span class="text-sm font-bold text-slate-700">期中報告 (25%)</span></div>
+                        <div class="flex items-center space-x-3"><div class="w-3 h-3 rounded-full bg-indigo-600"></div><span class="text-sm font-bold text-slate-700">期末報告 (25%)</span></div>
+                    </div>
+                    <div class="h-48 w-48"><canvas id="gradingChart"></canvas></div>
+                </div>
+            </section>
+            <!-- Action Items -->
+            <section class="bg-indigo-900 rounded-2xl p-8 text-white shadow-xl">
+                <h2 class="text-2xl font-bold flex items-center mb-6">📝 本週待辦事項</h2>
+                <div class="space-y-3 text-sm">
+                    <label class="flex items-center space-x-3 p-3 bg-indigo-800/50 rounded-lg cursor-pointer hover:bg-indigo-800 transition-all">
+                        <input type="checkbox" onchange="updateProgress()" class="h-5 w-5 text-emerald-400 rounded"><span class="text-indigo-100">各組組長確認 Gmail 準備接收邀請</span>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 bg-indigo-800/50 rounded-lg cursor-pointer hover:bg-indigo-800 transition-all">
+                        <input type="checkbox" onchange="updateProgress()" class="h-5 w-5 text-emerald-400 rounded"><span class="text-indigo-100">討論「小明」行程中最需要 AI 的環節</span>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 bg-indigo-800/50 rounded-lg cursor-pointer hover:bg-indigo-800 transition-all">
+                        <input type="checkbox" onchange="updateProgress()" class="h-5 w-5 text-emerald-400 rounded"><span class="font-bold text-yellow-300">下週預告：請務必攜帶筆記型電腦</span>
+                    </label>
+                </div>
+                <div class="mt-6 pt-4 border-t border-indigo-700/50 text-xs text-indigo-300 flex justify-between">
+                    <span>進度回報</span><span id="progress-text">0/3 完成</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 py-8 text-center text-slate-400 text-sm border-t border-slate-200">
+            <p class="mb-2">授課教師：[老師姓名] | 教學助理：[助教資訊]</p>
+            <p>企管系教學辦公室 © 2024</p>
+        </footer>
+
+    </main>
+
+    <script>
+        // --- API & State ---
+        const apiKey = ""; 
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('hidden');
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) document.getElementById('user-api-key').value = savedKey;
+        }
+        function saveApiKey() {
+            const key = document.getElementById('user-api-key').value.trim();
+            if (key) { localStorage.setItem('gemini_api_key', key); toggleSettings(); alert('金鑰儲存成功！'); }
+        }
+        function getApiKey() {
+            const localKey = localStorage.getItem('gemini_api_key');
+            if (localKey) return localKey;
+            if (typeof apiKey !== 'undefined' && apiKey) return apiKey;
+            return "";
+        }
+        async function callGemini(prompt, systemInstruction) {
+            const currentKey = getApiKey();
+            if (!currentKey) { alert('請點擊右上角 ⚙️ 設定您的 API Key！'); toggleSettings(); return null; }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentKey}`;
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] } }) });
+                const result = await response.json();
+                if (result.error) throw new Error(result.error.message);
+                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (e) { alert('AI 呼叫失敗：' + e.message); return null; }
+        }
+
+        // --- Functions ---
+        async function brainstormPainPoints() {
+            const role = document.getElementById('ai-role-input').value;
+            if(!role) return;
+            const loading = document.getElementById('brainstorm-loading');
+            const resBox = document.getElementById('brainstorm-result');
+            loading.classList.remove('hidden'); resBox.classList.add('hidden');
+            const resp = await callGemini(`角色：${role}`, "列出 5 個職場痛點與 AI 解決方案，使用繁體中文。");
+            loading.classList.add('hidden');
+            if (resp) { resBox.classList.remove('hidden'); resBox.innerText = resp; }
+        }
+        async function generateCodeSketch() {
+            const scenario = document.getElementById('ai-scenario-input').value;
+            if(!scenario) return;
+            const loading = document.getElementById('code-loading');
+            const resCon = document.getElementById('code-result-container');
+            loading.classList.remove('hidden'); resCon.classList.add('hidden');
+            const resp = await callGemini(`場景：${scenario}`, "生成一小段 HTML/Tailwind 代碼模擬此場景。只給代碼。");
+            loading.classList.add('hidden');
+            if (resp) { resCon.classList.remove('hidden'); document.getElementById('code-result').innerText = resp.replace(/```html|```/g, '').trim(); }
+        }
+        function copyCode() {
+            const code = document.getElementById('code-result').innerText;
+            const textArea = document.createElement("textarea"); textArea.value = code; document.body.appendChild(textArea); textArea.select(); document.execCommand('copy'); document.body.removeChild(textArea);
+            const btn = document.querySelector('[onclick="copyCode()"]'); btn.innerText = "已複製"; setTimeout(() => btn.innerText = "複製", 2000);
+        }
+        function switchTab(id) {
+            document.querySelectorAll('.task-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-task"]').forEach(b => { b.classList.remove('tab-active'); b.classList.add('tab-inactive'); });
+            document.getElementById(`content-${id}`).classList.remove('hidden');
+            document.getElementById(`tab-${id}`).classList.add('tab-active');
+            document.getElementById(`tab-${id}`).classList.remove('tab-inactive');
+        }
+        function updateProgress() {
+            const all = document.querySelectorAll('input[type="checkbox"]').length;
+            const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+            document.getElementById('progress-text').innerText = `${checked}/${all} 完成`;
+        }
+        function initChart() {
+            const ctx = document.getElementById('gradingChart').getContext('2d');
+            new Chart(ctx, { type: 'doughnut', data: { labels: ['平日', '期中', '期末'], datasets: [{ data: [50, 25, 25], backgroundColor: ['#3b82f6', '#2dd4bf', '#4f46e5'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+        }
+        document.addEventListener('DOMContentLoaded', initChart);
+    </script>
+</body>
+</html>
